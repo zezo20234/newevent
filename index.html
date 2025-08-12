@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Add Event</title>
+</head>
+<body>
+<h2>Create Event</h2>
+
+<label>Title:</label><br>
+<input type="text" id="eventTitle"><br><br>
+
+<label>Description:</label><br>
+<textarea id="eventDesc"></textarea><br><br>
+
+<label>End Date/Time:</label><br>
+<input type="datetime-local" id="eventEnd"><br><br>
+
+<button id="saveEvent">Save Event</button>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, push, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+// Same Firebase config as index.html
+const firebaseConfig = {
+    apiKey: "AIzaSyAjeXycCBhYoAU-0iiC4LbSTylKrrThN8Y",
+    authDomain: "sharplabubu.firebaseapp.com",
+    databaseURL: "https://sharplabubu-default-rtdb.firebaseio.com",
+    projectId: "sharplabubu",
+    storageBucket: "sharplabubu.firebasestorage.app",
+    messagingSenderId: "596148393481",
+    appId: "1:596148393481:web:4f822d86c44a13bd810ad8",
+    measurementId: "G-4M25R3BF08"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+document.getElementById("saveEvent").onclick = async () => {
+    const title = document.getElementById("eventTitle").value.trim();
+    const description = document.getElementById("eventDesc").value.trim();
+    const end = document.getElementById("eventEnd").value;
+
+    if (!title || !description || !end) {
+        alert("Please fill out all fields.");
+        return;
+    }
+
+    const endTime = new Date(end).getTime();
+    if (isNaN(endTime) || endTime <= Date.now()) {
+        alert("Please choose a future date/time.");
+        return;
+    }
+
+    const newEventRef = push(ref(db, "events"));
+    await set(newEventRef, {
+        title,
+        description,
+        endTime
+    });
+
+    alert("Event created!");
+    window.location.href = "index.html"; // Change to your main page name if different
+};
+</script>
+</body>
+</html>
