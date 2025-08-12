@@ -19,7 +19,7 @@
       padding: 30px;
       border-radius: 15px;
       box-shadow: 0 8px 25px rgba(0,0,0,0.2);
-      width: 350px;
+      width: 400px;
       animation: slideUp 0.7s ease-out;
     }
 
@@ -70,6 +70,27 @@
       box-shadow: 0 5px 15px rgba(0,0,0,0.2);
     }
 
+    /* New styles for the add-button section */
+    #buttonSection {
+      margin-top: 20px;
+      padding: 15px;
+      border: 2px solid #6a11cb;
+      border-radius: 10px;
+      background: #f5f0ff;
+    }
+
+    #buttonSection input[type="checkbox"] {
+      transform: scale(1.3);
+      margin-right: 8px;
+      vertical-align: middle;
+      cursor: pointer;
+    }
+
+    #buttonInputs {
+      margin-top: 15px;
+      display: none;
+    }
+
     @keyframes fadeIn {
       from { opacity: 0; }
       to { opacity: 1; }
@@ -94,6 +115,21 @@
 
   <label>End Date/Time:</label>
   <input type="datetime-local" id="eventEnd">
+
+  <div id="buttonSection">
+    <label>
+      <input type="checkbox" id="addButtonToggle">
+      Add a button for users to claim credits?
+    </label>
+
+    <div id="buttonInputs">
+      <label>Button Name:</label>
+      <input type="text" id="buttonName" placeholder="e.g. Claim 100 Credits">
+
+      <label>Credits to give when pressed:</label>
+      <input type="number" id="buttonCredits" min="1" placeholder="e.g. 100">
+    </div>
+  </div>
 
   <button id="saveEvent">Save Event</button>
 </div>
@@ -120,59 +156,100 @@ const db = getDatabase(app);
 // Discord webhook URL
 const eventWebhookURL = "https://discordapp.com/api/webhooks/1404625886329962678/m1bgTkbRRPY68k3Zl85MhkSYLsXv5GSoGEdU-FCb5IYT_N2DS6g03xopIR89yWTmAroC"; 
 
-// Function to send a webhook message
-async function sendEventWebhook(title, description, end) {
-    const webhookMessage = {
-        content: `@everyone 🎉 **New Event: ${title}** 🎉\n`
-               + `**Description:** ${description}\n`
-               + `**Ends:** <t:${Math.floor(new Date(end).getTime() / 1000)}:F>`,
-        allowed_mentions: {
-            parse: ["everyone"]
-        }
-    };
+// Toggle button inputs visibility
+const addButtonToggle = document.getElementById("addButtonToggle");
+const buttonInputs = document.getElementById("buttonInputs");
 
-    try {
-        const response = await fetch(eventWebhookURL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(webhookMessage)
-        });
-        if (!response.ok) {
-            console.error("Failed to send new event webhook.");
-        }
-    } catch (error) {
-        console.error("Error sending webhook:", error);
+addButtonToggle.addEventListener("change", () => {
+  buttonInputs.style.display = addButtonToggle.checked ? "block" : "none";
+});
+
+// Function to send a webhook message
+async function sendEventWebhook(title, description, end, button) {
+  let content = `@everyone 🎉 **New Event: ${title}** 🎉\n`
+    + `**Description:** ${description}\n`
+    + `**Ends:** <t:${Math.floor(new Date(end).getTime() / 1000)}:F>`;
+
+  if (button) {
+    content += `\n\n**Button:** ${button.name} — Grants **${button.credits} credits** (once per user)`;
+  }
+
+  const webhookMessage = {
+    content,
+    allowed_mentions: {
+      parse: ["everyone"]
     }
+  };
+
+  try {
+    const response = await fetch(eventWebhookURL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(webhookMessage)
+    });
+    if (!response.ok) {
+      console.error("Failed to send new event webhook.");
+    }
+  } catch (error) {
+    console.error("Error sending webhook:", error);
+  }
 }
 
 document.getElementById("saveEvent").onclick = async () => {
-    const title = document.getElementById("eventTitle").value.trim();
-    const description = document.getElementById("eventDesc").value.trim();
-    const end = document.getElementById("eventEnd").value;
+  const button = document.getElementById("saveEvent");
+  button.disabled = true;
 
-    if (!title || !description || !end) {
-        alert("Please fill out all fields.");
-        return;
+  const title = document.getElementById("eventTitle").value.trim();
+  const description = document.getElementById("eventDesc").value.trim();
+  const end = document.getElementById("eventEnd").value;
+
+  if (!title || !description || !end) {
+    alert("Please fill out all fields.");
+    button.disabled = false;
+    return;
+  }
+
+  const endTime = new Date(end).getTime();
+  if (isNaN(endTime) || endTime <= Date.now()) {
+    alert("Please choose a future date/time.");
+    button.disabled = false;
+    return;
+  }
+
+  let buttonData = null;
+  if (addButtonToggle.checked) {
+    const bName = document.getElementById("buttonName").value.trim();
+    const bCredits = Number(document.getElementById("buttonCredits").value);
+
+    if (!bName) {
+      alert("Please enter a button name.");
+      button.disabled = false;
+      return;
+    }
+    if (!bCredits || bCredits < 1) {
+      alert("Please enter a valid number of credits (1 or more).");
+      button.disabled = false;
+      return;
     }
 
-    const endTime = new Date(end).getTime();
-    if (isNaN(endTime) || endTime <= Date.now()) {
-        alert("Please choose a future date/time.");
-        return;
-    }
+    buttonData = {
+      name: bName,
+      credits: bCredits
+    };
+  }
 
-    const newEventRef = push(ref(db, "events"));
-    await set(newEventRef, {
-        title,
-        description,
-        endTime
-    });
+  const newEventRef = push(ref(db, "events"));
+  await set(newEventRef, {
+    title,
+    description,
+    endTime,
+    button: buttonData
+  });
 
-    // Send Discord ping
-    await sendEventWebhook(title, description, end);
+  await sendEventWebhook(title, description, end, buttonData);
 
-    alert("Event created!");
-    window.location.href = "index.html"; 
+  alert("Event created!");
+  window.location.href = "index.html"; 
 };
 </script>
 </body>
