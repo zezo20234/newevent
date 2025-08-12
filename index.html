@@ -36,6 +36,35 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+// Your Discord webhook URL for events. Create a separate one for this purpose.
+// This webhook will send messages for both new events and event endings.
+const eventWebhookURL = "https://discordapp.com/api/webhooks/1404625886329962678/m1bgTkbRRPY68k3Zl85MhkSYLsXv5GSoGEdU-FCb5IYT_N2DS6g03xopIR89yWTmAroC"; 
+
+// Function to send a webhook message
+async function sendEventWebhook(title, description, end) {
+    const webhookMessage = {
+        content: `🎉 **New Event: ${title}** 🎉\n`
+               + `**Description:** ${description}\n`
+               + `**Ends:** <t:${Math.floor(new Date(end).getTime() / 1000)}:F>`,
+        allowed_mentions: {
+            parse: ["everyone"]
+        }
+    };
+
+    try {
+        const response = await fetch(eventWebhookURL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(webhookMessage)
+        });
+        if (!response.ok) {
+            console.error("Failed to send new event webhook.");
+        }
+    } catch (error) {
+        console.error("Error sending webhook:", error);
+    }
+}
+
 document.getElementById("saveEvent").onclick = async () => {
     const title = document.getElementById("eventTitle").value.trim();
     const description = document.getElementById("eventDesc").value.trim();
@@ -58,6 +87,9 @@ document.getElementById("saveEvent").onclick = async () => {
         description,
         endTime
     });
+
+    // Send the Discord webhook message for the new event
+    await sendEventWebhook(title, description, end);
 
     alert("Event created!");
     window.location.href = "index.html"; // Change to your main page name if different
